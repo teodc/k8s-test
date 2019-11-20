@@ -40,8 +40,8 @@ nodeGroups:
     amiFamily: "Ubuntu1804"
     labels:
       foo: "bar"
-    desiredCapacity: 1
-    minSize: 1
+    desiredCapacity: 2
+    minSize: 2
     maxSize: 2
     volumeSize: 10
     volumeType: "gp2"
