@@ -1,0 +1,29 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: worker-deployment
+spec:
+  selector:
+    matchLabels:
+      component: worker
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        component: worker
+    spec:
+      volumes:
+        - name: storage-volume
+          persistentVolumeClaim:
+            claimName: storage-persistent-volume-claim
+      containers:
+        - name: php-worker
+          image: 123.abc.ecr.ap-northeast-1.amazonaws.com/acme-php-worker:${ECR_IMAGE_REVISION}
+          env:
+            - name: FOO
+              value: "BAR"
+          volumeMounts:
+            - name: storage-volume
+              mountPath: /app/storage/shared
+      imagePullSecrets:
+        - name: aws-ecr

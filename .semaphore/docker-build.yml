@@ -1,0 +1,48 @@
+version: "v1.0"
+
+name: "Docker build pipeline"
+
+agent:
+  machine:
+    type: "e1-standard-2"
+    os_image: "ubuntu1804"
+
+blocks:
+  - name: "Build images"
+    task:
+      env_vars:
+        - name: "AWS_DEFAULT_REGION"
+          value: "ap-northeast-1"
+        - name: "AWS_ECR_BASE_URI"
+          value: "123.abc.ecr.ap-northeast-1.amazonaws.com"
+      secrets:
+        - name: "acme-aws-credentials"
+      jobs:
+        - name: "Docker"
+          commands:
+            - checkout
+            # Install the awscli package
+            - sudo pip install awscli
+            # Log Docker in to ECR
+            - aws ecr get-login --no-include-email | bash
+            # Pull the latest version of the images so we can use Docker layer caching while building the new ones
+            - docker pull "${AWS_ECR_BASE_URI}/acme-nginx:latest" || true
+            - docker pull "${AWS_ECR_BASE_URI}/acme-php-api:latest" || true
+            - docker pull "${AWS_ECR_BASE_URI}/acme-php-scheduler:latest" || true
+            - docker pull "${AWS_ECR_BASE_URI}/acme-php-worker:latest" || true
+            # Build the new images based on the current Git revision
+            - docker build --cache-from "${AWS_ECR_BASE_URI}/acme-nginx:latest" -t "${AWS_ECR_BASE_URI}/acme-nginx:${SEMAPHORE_GIT_SHA}" -f ./docker/containers/nginx/Dockerfile .
+            - docker build --cache-from "${AWS_ECR_BASE_URI}/acme-php-api:latest" -t "${AWS_ECR_BASE_URI}/acme-php-api:${SEMAPHORE_GIT_SHA}" -f ./docker/containers/php-api/Dockerfile .
+            - docker build --cache-from "${AWS_ECR_BASE_URI}/acme-php-scheduler:latest" -t "${AWS_ECR_BASE_URI}/acme-php-scheduler:${SEMAPHORE_GIT_SHA}" -f ./docker/containers/php-scheduler/Dockerfile .
+            - docker build --cache-from "${AWS_ECR_BASE_URI}/acme-php-worker:latest" -t "${AWS_ECR_BASE_URI}/acme-php-worker:${SEMAPHORE_GIT_SHA}" -f ./docker/containers/php-worker/Dockerfile .
+            # Push the new images to ECR
+            - docker push "${AWS_ECR_BASE_URI}/acme-nginx:${SEMAPHORE_GIT_SHA}"
+            - docker push "${AWS_ECR_BASE_URI}/acme-php-api:${SEMAPHORE_GIT_SHA}"
+            - docker push "${AWS_ECR_BASE_URI}/acme-php-scheduler:${SEMAPHORE_GIT_SHA}"
+            - docker push "${AWS_ECR_BASE_URI}/acme-php-worker:${SEMAPHORE_GIT_SHA}"
+
+promotions:
+  - name: "Deploy to Kubernetes"
+    pipeline_file: "deploy-k8s.yml"
+#    auto_promote:
+#      when: "result = 'passed' and branch = 'master'"

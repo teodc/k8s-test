@@ -1,0 +1,63 @@
+version: "v1.0"
+
+name: "Deploy to Kubernetes pipeline"
+
+agent:
+  machine:
+    type: "e1-standard-2"
+    os_image: "ubuntu1804"
+
+blocks:
+  - name: "Deploy to Kubernetes"
+    task:
+      env_vars:
+        - name: "AWS_DEFAULT_REGION"
+          value: "ap-northeast-1"
+        - name: "AWS_ECR_BASE_URI"
+          value: "123.abc.ecr.ap-northeast-1.amazonaws.com"
+      secrets:
+        - name: "acme-aws-credentials"
+        - name: "acme-kubeconfig"
+      jobs:
+        - name: "kubectl"
+          commands:
+            - checkout
+            # Install the awscli package
+            - sudo pip install awscli
+            # Install the aws-iam-authenticator package
+            - mkdir -p ~/bin
+            - export PATH=~/bin:$PATH
+            - curl -o ~/bin/aws-iam-authenticator https://amazon-eks.s3-us-west-2.amazonaws.com/1.14.6/2019-08-22/bin/linux/amd64/aws-iam-authenticator
+            - chmod a+x ~/bin/aws-iam-authenticator
+            # Create a Kubernetes secret holding the credentials to allow to authenticate to ECR to pull the images
+            - export AWS_ECR_PASSWORD=$(aws ecr get-login --no-include-email | awk '{print $6}')
+            - kubectl delete secret aws-ecr || true
+            - kubectl create secret docker-registry aws-ecr --docker-server="https://$AWS_ECR_BASE_URI" --docker-username="AWS" --docker-password="$AWS_ECR_PASSWORD"
+            - kubectl get secret aws-ecr
+            # Prepare the deployment file with the proper ENV values
+            - envsubst < ./k8s/deployment.yml | tee deploy-${SEMAPHORE_GIT_SHA}.yml
+            # Perform declarative deployment of the current Git revision
+            - kubectl apply -f deploy-${SEMAPHORE_GIT_SHA}.yml
+  - name: "Tag latest release"
+    dependencies: ["Deploy to Kubernetes"]
+    task:
+      env_vars:
+        - name: "AWS_DEFAULT_REGION"
+          value: "ap-northeast-1"
+        - name: "AWS_ECR_BASE_URI"
+          value: "123.abc.ecr.ap-northeast-1.amazonaws.com"
+      secrets:
+        - name: "acme-aws-credentials"
+      jobs:
+        - name: Docker tag latest
+          commands:
+            # Install the awscli package
+            - sudo pip install awscli
+            # Log Docker in to ECR
+            - aws ecr get-login --no-include-email | bash
+            # Pull the image for the current Git revision
+            - docker pull "${AWS_ECR_BASE_URI}/acme-nginx:${SEMAPHORE_GIT_SHA}" || true
+            # Tag it to latest
+            - docker tag "${AWS_ECR_BASE_URI}/acme-nginx:${SEMAPHORE_GIT_SHA}" "${AWS_ECR_BASE_URI}/acme-nginx:latest"
+            # Push the image to ECR
+            - docker push "${AWS_ECR_BASE_URI}/acme-nginx:latest"

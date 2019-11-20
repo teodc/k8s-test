@@ -1,0 +1,56 @@
+apiVersion: extensions/v1beta1
+kind: Ingress
+metadata:
+  name: ingress-service
+  annotations:
+    # Setup specific ingress controller providers:
+    # 1) Install Helm:
+    # $ brew install kubernetes-helm
+    # 2) Setup Tiller service account:
+    # $ kubectl create serviceaccount --namespace kube-system tiller
+    # $ kubectl create clusterrolebinding tiller-cluster-rule --cluster-role=cluster-admin --serviceaccount=kube-system:tiller
+    # 3) Init Helm and Tiller:
+    # $ helm init --service-account tiller --upgrade
+    # 4) Setup specific provider:
+    # - For "nginx": (https://kubernetes.github.io/ingress-nginx/deploy/#using-helm)
+    # $ helm install stable/nginx-ingress --name acme-nginx [--set rbac.create=true]
+    # - For "alb": (https://kubernetes-sigs.github.io/aws-alb-ingress-controller/guide/controller/setup/#helm)
+    # $ helm repo add incubator http://storage.googleapis.com/kubernetes-charts-incubator
+    # $ helm install incubator/aws-alb-ingress-controller --set autoDiscoverAwsRegion=true --set autoDiscoverAwsVpcID=true --set clusterName=acme-cluster
+    kubernetes.io/ingress.class: "nginx"
+    nginx.ingress.kubernetes.io/rewrite-target: /$1
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    #certmanager.k8s.io/cluster-issuer: "letsencrypt-prod"
+spec:
+#  tls:
+#    - hosts:
+#        - acme.jp
+#        - www.acme.jp
+#      secretName: k8s-tls
+  rules:
+    - host: acme.jp
+      http:
+        paths:
+          - path: /?(.*)
+            backend:
+              serviceName: api-cluster-ip
+              servicePort: 80
+#          - path: /foo/?(.*)
+#            backend:
+#              serviceName: foo-service-name
+#              servicePort: 5000
+    - host: acme.jp
+      http:
+        paths:
+          - path: /
+            backend:
+              serviceName: api-cluster-ip
+              servicePort: 80
+          - path: /?(.*)
+            backend:
+              serviceName: service-name
+              servicePort: 5000
+#          - path: /foo/?(.*)
+#            backend:
+#              serviceName: foo-service-name
+#              servicePort: 5000

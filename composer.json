@@ -1,0 +1,24 @@
+{
+  "name": "teodc/k8s-test",
+  "type": "project",
+  "require": {
+    "php": "^7.3"
+  },
+  "require-dev": {
+    "phpunit/phpunit": "~8.0"
+  },
+  "autoload": {
+    "classmap": [
+      "src/"
+    ]
+  },
+  "config": {
+    "preferred-install": "dist",
+    "bin-dir": "vendor/bin",
+    "vendor-dir": "vendor",
+    "sort-packages": true,
+    "optimize-autoloader": true
+  },
+  "minimum-stability": "dev",
+  "prefer-stable": true
+}

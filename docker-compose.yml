@@ -1,0 +1,45 @@
+version: '3'
+
+services:
+  nginx:
+    build:
+      context: .
+      dockerfile: docker/containers/nginx/Dockerfile
+      args:
+        - NGINX_VERSION=${DOCKER_NGINX_VERSION}
+    volumes:
+      - .:/var/www/acme
+      - ./docker/logs/nginx:/var/log/nginx
+    ports:
+      - 80:80
+    depends_on:
+      - php-api
+  php-api:
+    build:
+      context: .
+      dockerfile: docker/containers/php-api/Dockerfile
+      args:
+        - PHP_VERSION=${DOCKER_PHP_VERSION}
+    volumes:
+      - .:/app/acme
+      - ./docker/logs/php-api:/var/log/php-fpm
+    expose:
+      - 9000
+  php-worker:
+    build:
+      context: .
+      dockerfile: docker/containers/php-worker/Dockerfile
+      args:
+        - PHP_VERSION=${DOCKER_PHP_VERSION}
+    volumes:
+      - .:/app/acme
+    tty: true
+  php-scheduler:
+    build:
+      context: .
+      dockerfile: docker/containers/php-scheduler/Dockerfile
+      args:
+        - PHP_VERSION=${DOCKER_PHP_VERSION}
+    volumes:
+      - .:/app/acme
+    tty: true

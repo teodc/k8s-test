@@ -1,0 +1,53 @@
+version: "v1.0"
+
+name: "Main pipeline"
+
+agent:
+  machine:
+    type: "e1-standard-2"
+    os_image: "ubuntu1804"
+
+fail_fast:
+  cancel:
+    when: "true"
+
+auto_cancel:
+  running:
+    when: "true"
+
+global_job_config:
+  prologue:
+    commands:
+      - checkout
+      - cp .env.dist .env
+      - cache restore composer-vendor-$(checksum composer.lock)
+
+blocks:
+  - name: "Install dependencies"
+    task:
+      epilogue:
+        on_pass:
+          commands:
+            - cache store composer-vendor-$(checksum composer.lock) vendor
+        on_fail:
+          commands:
+            - cache delete composer-vendor-$(checksum composer.lock) vendor
+      jobs:
+        - name: "Composer"
+          commands:
+            - composer global require hirak/prestissimo
+            - composer install -on
+
+  - name: "Run tests"
+    dependencies: ["Install Dependencies"]
+    task:
+      jobs:
+        - name: "PHPUnit"
+          commands:
+            - vendor/bin/phpunit --testdox
+
+promotions:
+  - name: "Dockerize"
+    pipeline_file: "docker-build.yml"
+#    auto_promote:
+#      when: "result = 'passed' and branch = 'master'"
