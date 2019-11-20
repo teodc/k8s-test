@@ -14,11 +14,11 @@ blocks:
         - name: "AWS_DEFAULT_REGION"
           value: "ap-northeast-1"
         - name: "AWS_ECR_BASE_URI"
-          value: "123.abc.ecr.ap-northeast-1.amazonaws.com"
+          value: "12345.dkr.ecr.ap-northeast-1.amazonaws.com"
       secrets:
         - name: "acme-aws-credentials"
       jobs:
-        - name: "Docker"
+        - name: "Docker build & push"
           commands:
             - checkout
             # Install the awscli package

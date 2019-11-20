@@ -14,20 +14,20 @@ spec:
     spec:
       containers:
         - name: php-api
-          image: 123.abc.ecr.ap-northeast-1.amazonaws.com/acme-php-api:${ECR_IMAGE_REVISION}
+          image: 12345.dkr.ecr.ap-northeast-1.amazonaws.com/acme-php-api:${ECR_IMAGE_TAG}
           ports:
             - containerPort: 9000
           env:
             - name: FOO
-              value: "123" # Make sure the value is always a string
+              value: "42" # Make sure the value is always a string
 #            - name: SECRET # kubectl create secret generic secret-name --from-literal SECRET=abcd1234
 #              valueFrom:
 #                secretKeyRef:
 #                  name: secret-name
 #                  key: SECRET
         - name: nginx
-          image: 123.abc.ecr.ap-northeast-1.amazonaws.com/acme-nginx:${ECR_IMAGE_REVISION}
+          image: 12345.dkr.ecr.ap-northeast-1.amazonaws.com/acme-nginx:${ECR_IMAGE_TAG}
           ports:
             - containerPort: 80
       imagePullSecrets:
-        - name: aws-ecr # kubectl create secret docker-registry aws-ecr --docker-server=https://123.abc.ecr.ap-northeast-1.amazonaws.com --docker-username=AWS --docker-password=$(aws ecr get-login --no-include-email | awk '{print $6}')
+        - name: aws-ecr # kubectl create secret docker-registry aws-ecr --docker-server=https://12345.dkr.ecr.ap-northeast-1.amazonaws.com --docker-username=AWS --docker-password=$(aws ecr get-login --no-include-email | awk '{print $6}')

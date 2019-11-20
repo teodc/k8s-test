@@ -14,12 +14,12 @@ blocks:
         - name: "AWS_DEFAULT_REGION"
           value: "ap-northeast-1"
         - name: "AWS_ECR_BASE_URI"
-          value: "123.abc.ecr.ap-northeast-1.amazonaws.com"
+          value: "12345.dkr.ecr.ap-northeast-1.amazonaws.com"
       secrets:
         - name: "acme-aws-credentials"
         - name: "acme-kubeconfig"
       jobs:
-        - name: "kubectl"
+        - name: "kubectl apply"
           commands:
             - checkout
             # Install the awscli package
@@ -34,30 +34,43 @@ blocks:
             - kubectl delete secret aws-ecr || true
             - kubectl create secret docker-registry aws-ecr --docker-server="https://$AWS_ECR_BASE_URI" --docker-username="AWS" --docker-password="$AWS_ECR_PASSWORD"
             - kubectl get secret aws-ecr
-            # Prepare the deployment file with the proper ENV values
-            - envsubst < ./k8s/deployment.yml | tee deploy-${SEMAPHORE_GIT_SHA}.yml
-            # Perform declarative deployment of the current Git revision
-            - kubectl apply -f deploy-${SEMAPHORE_GIT_SHA}.yml
-  - name: "Tag latest release"
+            # Prepare the deployment files for the current Git revision
+            - export ECR_IMAGE_TAG=${SEMAPHORE_GIT_SHA}
+            - envsubst < ./k8s/api-deployment.yml.dist > ./k8s/api-deployment-${ECR_IMAGE_TAG}.yml
+            - envsubst < ./k8s/worker-deployment.yml.dist > ./k8s/worker-deployment-${ECR_IMAGE_TAG}.yml
+            - envsubst < ./k8s/scheduler-deployment.yml.dist > ./k8s/scheduler-deployment-${ECR_IMAGE_TAG}.yml
+            # Perform declarative deployment
+            - kubectl apply -f k8s
+  - name: "Tag images as latest"
     dependencies: ["Deploy to Kubernetes"]
     task:
       env_vars:
         - name: "AWS_DEFAULT_REGION"
           value: "ap-northeast-1"
         - name: "AWS_ECR_BASE_URI"
-          value: "123.abc.ecr.ap-northeast-1.amazonaws.com"
+          value: "12345.dkr.ecr.ap-northeast-1.amazonaws.com"
       secrets:
         - name: "acme-aws-credentials"
       jobs:
-        - name: Docker tag latest
+        - name: "Docker tag & push"
           commands:
+            - checkout
             # Install the awscli package
             - sudo pip install awscli
             # Log Docker in to ECR
             - aws ecr get-login --no-include-email | bash
-            # Pull the image for the current Git revision
+            # Pull the images at the current Git revision
             - docker pull "${AWS_ECR_BASE_URI}/acme-nginx:${SEMAPHORE_GIT_SHA}" || true
-            # Tag it to latest
+            - docker pull "${AWS_ECR_BASE_URI}/acme-php-api:${SEMAPHORE_GIT_SHA}" || true
+            - docker pull "${AWS_ECR_BASE_URI}/acme-php-scheduler:${SEMAPHORE_GIT_SHA}" || true
+            - docker pull "${AWS_ECR_BASE_URI}/acme-php-worker:${SEMAPHORE_GIT_SHA}" || true
+            # Tag the images as latest
             - docker tag "${AWS_ECR_BASE_URI}/acme-nginx:${SEMAPHORE_GIT_SHA}" "${AWS_ECR_BASE_URI}/acme-nginx:latest"
-            # Push the image to ECR
+            - docker tag "${AWS_ECR_BASE_URI}/acme-php-api:${SEMAPHORE_GIT_SHA}" "${AWS_ECR_BASE_URI}/acme-php-api:latest"
+            - docker tag "${AWS_ECR_BASE_URI}/acme-php-scheduler:${SEMAPHORE_GIT_SHA}" "${AWS_ECR_BASE_URI}/acme-php-scheduler:latest"
+            - docker tag "${AWS_ECR_BASE_URI}/acme-php-worker:${SEMAPHORE_GIT_SHA}" "${AWS_ECR_BASE_URI}/acme-php-worker:latest"
+            # Push the images to ECR
             - docker push "${AWS_ECR_BASE_URI}/acme-nginx:latest"
+            - docker push "${AWS_ECR_BASE_URI}/acme-php-api:latest"
+            - docker push "${AWS_ECR_BASE_URI}/acme-php-scheduler:latest"
+            - docker push "${AWS_ECR_BASE_URI}/acme-php-worker:latest"
